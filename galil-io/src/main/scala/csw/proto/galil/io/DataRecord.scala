@@ -3,7 +3,7 @@ package csw.proto.galil.io
 import java.io.IOException
 import java.nio.{ByteBuffer, ByteOrder}
 
-import org.apache.pekko.util.ByteString
+import akka.util.ByteString
 import csw.params.commands.CommandResponse.{Completed, SubmitResponse}
 import csw.params.commands.Result
 import csw.params.core.generics.{Key, KeyType, Parameter}

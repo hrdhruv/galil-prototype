@@ -7,6 +7,7 @@ import org.apache.pekko.actor.typed.{ActorSystem, SpawnProtocol}
  * Simulates the protocol used to talk to the Galil hardware.
  */
 object GalilSimulatorApp {
+  println(s"[DEBUG] Sending command to Galil: 1 cmd")
 
   implicit val typedSystem: ActorSystem[SpawnProtocol.Command] = ActorSystem(SpawnProtocol(), "GalilSimulatorApp")
 
@@ -44,9 +45,11 @@ object GalilSimulatorApp {
       case None => System.exit(1)
     }
   }
-
+  
   private def run(options: Options): Unit = {
     import options._
+    println(s"[DEBUG] Sending command to Galil 2: md")
+
     GalilSimulator(host, port)
   }
 }

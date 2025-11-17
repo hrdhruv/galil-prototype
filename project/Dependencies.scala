@@ -1,52 +1,49 @@
 import sbt._
 
-//noinspection TypeAnnotation
 object Dependencies {
 
-  val GalilHcd = Seq(
-    CSW.`csw-framework`,
-    CSW.`csw-testkit` % Test,
-    Libs.`scalatest` % Test,
-//    Libs.`junit` % Test,
-//    Libs.`junit-interface` % Test
+  val cswVersion = "5.0.1"
+
+  lazy val GalilHcd = Seq(
+    "com.github.tmtsoftware.csw" %% "csw-framework" % cswVersion,
+    "com.github.tmtsoftware.csw" %% "csw-testkit" % cswVersion % Test,
+    "org.scalatest"               %% "scalatest"   % "3.2.17" % Test
   )
 
-  val GalilAssembly = Seq(
-    CSW.`csw-framework`,
-    CSW.`csw-testkit` % Test,
-    Libs.`scalatest` % Test,
-//    Libs.`junit` % Test,
-//    Libs.`junit-interface` % Test
+  lazy val GalilAssembly = Seq(
+    "com.github.tmtsoftware.csw" %% "csw-framework" % cswVersion,
+    "com.github.tmtsoftware.csw" %% "csw-testkit" % cswVersion % Test,
+    "org.scalatest"               %% "scalatest"   % "3.2.17" % Test
   )
 
-  val GalilClient = Seq(
-    CSW.`csw-framework`,
-    CSW.`csw-testkit`,
-    Libs.scalatest % Test
+  lazy val GalilClient = Seq(
+    "com.github.tmtsoftware.csw" %% "csw-framework" % cswVersion,
+    "com.github.tmtsoftware.csw" %% "csw-testkit"  % cswVersion,
+    "org.scalatest"               %% "scalatest"    % "3.2.17" % Test
   )
 
-  val GalilDeploy = Seq(
-    CSW.`csw-framework`,
-    Libs.scalatest % Test
+  lazy val GalilDeploy = Seq(
+    "com.github.tmtsoftware.csw" %% "csw-framework" % cswVersion,
+    "org.scalatest"               %% "scalatest"    % "3.2.17" % Test
   )
 
-  val GalilSimulator = Seq(
-    CSW.`csw-framework`,
-    Libs.scalatest % Test
+  lazy val GalilSimulator = Seq(
+    "com.github.tmtsoftware.csw" %% "csw-framework" % cswVersion,
+    "org.scalatest"               %% "scalatest"    % "3.2.17" % Test
   )
 
-  val GalilRepl = Seq(
-    CSW.`csw-framework`
+  lazy val GalilRepl = Seq(
+    "com.github.tmtsoftware.csw" %% "csw-framework" % cswVersion
   )
 
-  val GalilIo = Seq(
-    CSW.`csw-framework`,
-    Libs.playJson,
-    Libs.scalatest % Test
+  lazy val GalilIo = Seq(
+    "com.github.tmtsoftware.csw" %% "csw-framework" % cswVersion,
+    "com.typesafe.play" %% "play-json" % "2.10.0",
+    "org.scalatest"              %% "scalatest"     % "3.2.17" % Test
   )
 
-  val GalilCommands = Seq(
-    CSW.`csw-framework`,
-    Libs.scalatest % Test
+  lazy val GalilCommands = Seq(
+    "com.github.tmtsoftware.csw" %% "csw-framework" % cswVersion,
+    "org.scalatest"               %% "scalatest"   % "3.2.17" % Test
   )
 }

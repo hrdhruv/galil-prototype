@@ -1,6 +1,6 @@
 package csw.proto.galil.io
 
-import org.apache.pekko.util.ByteString
+import akka.util.ByteString
 
 import GalilIo._
 
@@ -144,6 +144,7 @@ case class GalilIoTcp(host: String = "127.0.0.1", port: Int = 8888) extends Gali
     val length = socket.getInputStream.read(buf)
     ByteString.fromArray(buf, 0, length)
   }
+  println(s"[DEBUG] Sending command to GalilIO")
 
   override def close(): Unit = socket.close()
 }

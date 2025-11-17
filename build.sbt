@@ -1,5 +1,11 @@
 import Dependencies._
 
+ThisBuild / scalaVersion := "2.13.12"
+ThisBuild / version      := "0.1.0"
+ThisBuild / organization := "com.example"
+
+Compile / packageBin / mainClass := Some("csw.proto.galil.hcd.GalilHcdApp")
+
 lazy val aggregatedProjects: Seq[ProjectReference] = Seq(
   `galil-assembly`,
   `galil-hcd`,
@@ -7,8 +13,7 @@ lazy val aggregatedProjects: Seq[ProjectReference] = Seq(
   `galil-simulator`,
   `galil-repl`,
   `galil-io`,
-//  `galil-commands`,
-  `galil-deploy`,
+  `galil-deploy`
 )
 
 lazy val `galil-root` = project
@@ -30,38 +35,32 @@ lazy val `galil-assembly` = project
     libraryDependencies ++= GalilAssembly
   )
 
-// A Scala client application that talks to the Galil assembly
+// Scala client
 lazy val `galil-client` = project
   .enablePlugins(DeployApp)
-  .settings(libraryDependencies ++= `GalilClient`)
+  .settings(libraryDependencies ++= GalilClient)
   .dependsOn(`galil-io`, `galil-simulator`, `galil-hcd` % "test->test")
 
-// A Galil hardware simulator
+// Galil simulator
 lazy val `galil-simulator` = project
   .enablePlugins(DeployApp)
-  .settings(libraryDependencies ++= `GalilSimulator`)
+  .settings(libraryDependencies ++= GalilSimulator)
   .dependsOn(`galil-io`)
 
-// A REPL client to test talking to the Galil hardware or simulator
+// REPL client
 lazy val `galil-repl` = project
   .enablePlugins(DeployApp)
-  .settings(libraryDependencies ++= `GalilRepl`)
+  .settings(libraryDependencies ++= GalilRepl)
   .dependsOn(`galil-io`)
 
-// Supports talking to and simulating a Galil device
+// Galil IO module
 lazy val `galil-io` = project
-  .settings(libraryDependencies ++= `GalilIo`)
+  .settings(libraryDependencies ++= GalilIo)
 
-//// Supports Galil commands and responses as described in a config file
-//lazy val `galil-commands` = project
-//  .settings(libraryDependencies ++= `GalilCommands`)
-//  .dependsOn(`galil-io`)
-
-// deploy module
+// Deploy module
 lazy val `galil-deploy` = project
   .enablePlugins(DeployApp)
   .dependsOn(`galil-assembly`, `galil-hcd`)
   .settings(
     libraryDependencies ++= GalilDeploy
   )
-

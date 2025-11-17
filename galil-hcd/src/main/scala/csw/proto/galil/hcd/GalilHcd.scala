@@ -1,140 +1,142 @@
 package csw.proto.galil.hcd
 
-import org.apache.pekko.actor.typed.ActorRef
-import org.apache.pekko.actor.typed.scaladsl.ActorContext
-import com.typesafe.config.ConfigFactory
+import akka.actor.typed.scaladsl.ActorContext
 import csw.command.client.messages.TopLevelActorMessage
 import csw.framework.deploy.containercmd.ContainerCmd
 import csw.framework.models.CswContext
 import csw.framework.scaladsl.ComponentHandlers
 import csw.location.api.models.TrackingEvent
-import csw.params.commands.CommandResponse.{SubmitResponse, ValidateCommandResponse}
-import csw.params.commands._
-import csw.params.core.models.{Id, ObsId}
-import csw.prefix.models.Subsystem.CSW
-import csw.proto.galil.hcd.CSWDeviceAdapter.CommandMapEntry
-import csw.proto.galil.hcd.GalilCommandMessage.{GalilCommand, GalilRequest}
+import csw.params.commands.CommandResponse._
+import csw.params.commands.CommandIssue.UnsupportedCommandIssue
+import csw.params.commands.{ControlCommand, Setup}
+import csw.params.core.models.Id
+import csw.params.events.{EventName, SystemEvent}
+import csw.prefix.models.Subsystem
 import csw.time.core.models.UTCTime
 
 import scala.concurrent.ExecutionContextExecutor
+import scala.language.postfixOps
 
-// Add messages here...
-sealed trait GalilCommandMessage
-
-object GalilCommandMessage {
-
-  case class GalilCommand(commandString: String) extends GalilCommandMessage
-
-  case class GalilRequest(commandString: String, runId: Id, maybeObsId: Option[ObsId], cmdMapEntry: CommandMapEntry)
-      extends GalilCommandMessage
-
-}
-
+/**
+ * GalilHcdHandlers simulates the Galil Hardware Control Device.
+ * It receives setup commands (e.g., move-motor) and simulates actuator movement.
+ * It publishes position updates as SystemEvents for the Assembly to subscribe to.
+ */
 class GalilHcdHandlers(ctx: ActorContext[TopLevelActorMessage], cswCtx: CswContext)
     extends ComponentHandlers(ctx, cswCtx) {
 
   import cswCtx._
 
-  private val log                           = loggerFactory.getLogger
   implicit val ec: ExecutionContextExecutor = ctx.executionContext
-  private val config                        = ConfigFactory.load("GalilCommands.conf")
-  private val adapter                       = new CSWDeviceAdapter(config)
-  private val galilIoActor: ActorRef[GalilCommandMessage] =
-    ctx.spawn(
-      GalilIOActor
-        .behavior(
-          getGalilConfig,
-          commandResponseManager,
-          adapter,
-          loggerFactory,
-          componentInfo.prefix,
-          cswCtx.currentStatePublisher
-        ),
-      "GalilIOActor"
-    )
+  private val log                           = loggerFactory.getLogger
+  private val prefix                        = cswCtx.componentInfo.prefix
+  private val publisher                     = eventService.defaultPublisher
 
-  override def initialize(): Unit = log.debug("Initialize called")
+  override def initialize(): Unit = {
+    log.info(s"Initializing $prefix")
+    log.info(s"GalilHcd: Checking current actuator position")
+    log.info(s"Current Position - ${GalilInfo.currentPosition.head} mm")
+  }
 
-  override def onShutdown(): Unit = log.debug("onShutdown called")
-
-  override def onGoOffline(): Unit = log.debug("onGoOffline called")
-
-  override def onGoOnline(): Unit = log.debug("onGoOnline called")
+  override def onLocationTrackingEvent(trackingEvent: TrackingEvent): Unit = {}
 
   override def validateCommand(runId: Id, controlCommand: ControlCommand): ValidateCommandResponse = {
-    log.debug(s"validateSubmit called: $controlCommand")
-    controlCommand match {
-      case x: Setup =>
-        val cmdMapEntry = adapter.getCommandMapEntry(x)
-        if (cmdMapEntry.isSuccess) {
-          val cmdString = adapter.validateSetup(x, cmdMapEntry.get)
-          if (cmdString.isSuccess) {
-            CommandResponse.Accepted(runId)
-          }
-          else {
-            CommandResponse.Invalid(runId, CommandIssue.ParameterValueOutOfRangeIssue(cmdString.failed.get.getMessage))
-          }
-        }
-        else {
-          CommandResponse.Invalid(runId, CommandIssue.OtherIssue(cmdMapEntry.failed.get.getMessage))
-        }
-      case _: Observe =>
-        CommandResponse.Invalid(runId, CommandIssue.UnsupportedCommandIssue("Observe not supported"))
-    }
+    log.info(s"Validating command: ${controlCommand.commandName.name}")
+    Accepted(runId)
   }
 
   override def onSubmit(runId: Id, controlCommand: ControlCommand): SubmitResponse = {
-    log.debug(s"onSubmit called: $controlCommand")
+    log.info(s"GalilHcd: Handling command with runId - $runId")
     controlCommand match {
-      case setup: Setup =>
-        val cmdMapEntry = adapter.getCommandMapEntry(setup)
-        val cmdString   = adapter.validateSetup(setup, cmdMapEntry.get)
-        galilIoActor ! GalilRequest(cmdString.get, runId, setup.maybeObsId, cmdMapEntry.get)
-        CommandResponse.Started(runId)
-      case x =>
-        // Should not happen after validation
-        CommandResponse.Error(runId, s"Unexpected submit: $x")
+      case setup: Setup => onSetup(runId, setup)
+      case _            => Invalid(runId, UnsupportedCommandIssue("GalilHcd: Unsupported Command"))
     }
   }
 
-  override def onOneway(runId: Id, controlCommand: ControlCommand): Unit = {
-    log.debug(s"onOneway called: $controlCommand")
-    controlCommand match {
-      case setup: Setup =>
-        val cmdMapEntry = adapter.getCommandMapEntry(setup)
-        val cmdString   = adapter.validateSetup(setup, cmdMapEntry.get)
-        cmdString.get match {
-          case cmd if cmd == GalilIOActor.publishDataRecord =>
-            galilIoActor ! GalilCommand(cmd)
-          case cmd =>
-            galilIoActor ! GalilRequest(cmd, runId, setup.maybeObsId, cmdMapEntry.get)
-        }
-      case _ => // Only Setups handled
+  /**
+   * Simulates actuator movement with an in–out–in cycle,
+   * publishing intermediate position updates.
+   */
+  private def onSetup(runId: Id, setup: Setup): SubmitResponse = {
+    println(s"GalilHcd : Received command - OnSubmit - Executing setup")
+    log.info(s"GalilHcd : Executing the received command with runId - $runId")
+
+    val step  = GalilInfo.movementStep.head
+    val min   = GalilInfo.minExtension.head
+    val max   = GalilInfo.maxExtension.head
+    val delay = 50 // milliseconds per step
+
+    def moveActuator(target: Double): Unit = {
+      var pos = GalilInfo.currentPosition.head
+      while (Math.abs(pos - target) > step) {
+        pos =
+          if (pos < target) Math.min(pos + step, max)
+          else Math.max(pos - step, min)
+
+        GalilInfo.currentPosition = GalilInfo.currentPositionKey.set(pos)
+        val message = s"GalilHcd : Moving actuator to $pos mm"
+
+        val event = createMovementEvent(message, pos)
+        publisher.publish(event)
+
+        Thread.sleep(delay)
+      }
+
+      // Snap to final target
+      GalilInfo.currentPosition = GalilInfo.currentPositionKey.set(target)
+      log.info(s"GalilHcd : Actuator reached target position ${GalilInfo.currentPosition.head} mm")
+
+      // val event = createMovementEvent(s"Reached target $target mm", target)
+      // publisher.publish(event)
     }
+
+    val current = GalilInfo.currentPosition.head
+    log.info(s"GalilHcd : Actuator is currently at $current mm")
+
+    // 1️⃣ Move forward to in-position (500 mm)
+    moveActuator(500)
+
+    // 2️⃣ Wait briefly
+    log.info("GalilHcd : Holding position for 2 seconds before returning")
+    Thread.sleep(2000)
+
+    // 3️⃣ Move back to out-position (0 mm)
+    moveActuator(0)
+
+    // Final status event
+    // val statusEvent = SystemEvent(componentInfo.prefix, EventName("GalilHcdStatus"))
+    //   .madd(GalilInfo.statusKey.set("Cycle Completed"))
+    // publisher.publish(statusEvent)
+
+    // log.info("GalilHcd : Actuator cycle completed successfully.")
+    Completed(runId)
   }
 
-  override def onLocationTrackingEvent(trackingEvent: TrackingEvent): Unit =
-    log.debug(s"onLocationTrackingEvent called: $trackingEvent")
-
-  def getGalilConfig: GalilConfig = {
-    val config = ctx.system.settings.config
-    val host =
-      if (config.hasPath("galil.host")) config.getString("galil.host")
-      else "127.0.0.1"
-    val port =
-      if (config.hasPath("galil.port")) config.getInt("galil.port") else 8888
-    log.info(s"Galil host = $host, port = $port")
-    GalilConfig(host, port)
+  /**
+   * Publishes position and message as movement event updates.
+   */
+  private def createMovementEvent(message: String, position: Double): SystemEvent = {
+    SystemEvent(componentInfo.prefix, EventName("MotorPositionEvent"))
+      .madd(
+        GalilInfo.messageKey.set(message),
+        GalilInfo.currentPositionKey.set(position)
+      )
   }
 
+  override def onOneway(runId: Id, controlCommand: ControlCommand): Unit = {}
+
+  override def onShutdown(): Unit = log.info("Shutting down GalilHcd.")
+  override def onGoOffline(): Unit = log.info("GalilHcd going offline.")
+  override def onGoOnline(): Unit = log.info("GalilHcd back online.")
   override def onDiagnosticMode(startTime: UTCTime, hint: String): Unit = {}
-
   override def onOperationsMode(): Unit = {}
 }
 
+/**
+ * Application entry point for Galil HCD.
+ */
 object GalilHcdApp {
   def main(args: Array[String]): Unit = {
-    val defaultConfig = ConfigFactory.load("GalilHcd.conf")
-    ContainerCmd.start("galil.hcd.GalilHcd", CSW, args, Some(defaultConfig))
+    ContainerCmd.start("csw.galil.hcd.GalilHcd", Subsystem.CSW, args)
   }
 }

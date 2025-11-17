@@ -1,12 +1,22 @@
+error id: file://<WORKSPACE>/galil-hcd/src/main/scala/csw/proto/galil/hcd/GalilIOActor.scala:pekko.
+file://<WORKSPACE>/galil-hcd/src/main/scala/csw/proto/galil/hcd/GalilIOActor.scala
+empty definition using pc, found symbol in pc: pekko.
+empty definition using semanticdb
+empty definition using fallback
+non-local guesses:
+	 -org/apache/pekko.
+	 -scala/Predef.org.apache.pekko.
+offset: 78
+uri: file://<WORKSPACE>/galil-hcd/src/main/scala/csw/proto/galil/hcd/GalilIOActor.scala
+text:
+```scala
 package csw.proto.galil.hcd
 
 import java.io.IOException
-import scala.concurrent.duration._
 
-import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.Behaviors
-import akka.util.ByteString
-
+import org.apache.pek@@ko.actor.typed.Behavior
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.util.ByteString
 import csw.command.client.CommandResponseManager
 import csw.framework.CurrentStatePublisher
 import csw.logging.client.scaladsl.LoggerFactory
@@ -19,7 +29,7 @@ import csw.proto.galil.hcd.CSWDeviceAdapter.CommandMapEntry
 import csw.proto.galil.io.{DataRecord, GalilIo, GalilIoTcp}
 
 /**
- * Worker actor that handles the Galil I/O (Akka version)
+ * Worker actor that handles the Galil I/O
  */
 private[hcd] object GalilIOActor {
 
@@ -52,7 +62,7 @@ private[hcd] object GalilIOActor {
         GalilIoTcp(galilConfig.host, galilConfig.port)
       } catch {
         case ex: Exception =>
-          log.error(s"Failed to connect to Galil at ${galilConfig.host}:${galilConfig.port}", Map("exception" -> ex))
+          log.error(s"Failed to connect to Galil at ${galilConfig.host}:${galilConfig.port}")
           throw ex
       }
 
@@ -115,3 +125,10 @@ private[hcd] object GalilIOActor {
       }
     }
 }
+
+```
+
+
+#### Short summary: 
+
+empty definition using pc, found symbol in pc: pekko.
